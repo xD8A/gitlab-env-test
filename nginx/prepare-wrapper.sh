@@ -1,5 +1,8 @@
 #!/bin/sh
 
+sed -iE "s/gitlab.example.com/$GITLAB_HOST/g" /etc/nginx/conf.d/gitlab.conf
+sed -iE "s/keycloak.example.com/$KEYCLOAK_HOST/g" /etc/nginx/conf.d/keycloak.conf
+
 mkdir -p /etc/nginx/ssl
 export IP1=$(hostname -I)
 echo "IP Address: $IP1"

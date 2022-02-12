@@ -80,15 +80,20 @@ services:
     image: nginx:1
     ports:
       - 80:80/tcp
+    environment:
+      GITLAB_HOST: "${GITLAB_HOST}"
+      KEYCLOAK_HOST: "${KEYCLOAK_HOST}"
     volumes:
       - ./nginx/prepare-wrapper.sh:/usr/local/bin/prepare-wrapper.sh:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/gitlab.conf:/etc/nginx/conf.d/gitlab.conf:Z
+      - ./nginx/keycloak.conf:/etc/nginx/conf.d/keycloak.conf:Z
     depends_on:
       - gitlab
       - keycloak
     command: ['prepare-wrapper.sh', 'nginx', '-g daemon off;']
     healthcheck:
-      test: ['CMD-SHELL', 'health-check.sh']
+      test: ['CMD-SHELL', 'service nginx status || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
