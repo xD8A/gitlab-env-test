@@ -4,18 +4,21 @@ services:
   postgres:
     image: postgres:12
     expose:
-      - "5432"
-    user: postgres
+      - '5432'
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       GITLAB_USER: gitlab
-      GITLAB_PASSWORD: gitlab
+      GITLAB_PASSWORD: "${GITLAB_PASSWORD}"
       GITLAB_DB: gitlabhq_production
+      KEYCLOAK_USER: keycloak
+      KEYCLOAK_PASSWORD: "${KEYCLOAK_PASSWORD}"
+      KEYCLOAK_DB: keycloak
     volumes:
       - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./postgres/data:/var/lib/postgresql/data:Z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ['CMD-SHELL', 'pg_isready']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,13 +30,49 @@ services:
       - 80:80/tcp
       - 443:443/tcp
       - 22:22/tcp
+    volumes:
+      - ./gitlab/wait-deps-wrapper.sh:/usr/local/bin/wait-deps-wrapper.sh:ro
+      - ./gitlab/config:/etc/gitlab:Z
+      #- ./gitlab/data:/var/opt/gitlab:Z
+      #- ./gitlab/logs:/var/log/gitlab:Z
     environment:
-      GITLAB_OMNIBUS_CONFIG: |-
-        external_url 'http://gitlab.myvoid.blog'
-        gitlab_rails['initial_root_password'] = '********'
+      GITLAB_DATABASE_HOST: postgres
+      GITLAB_DATABASE_USERNAME: gitlab
+      GITLAB_DATABASE_PASSWORD: "${GITLAB_PASSWORD}"
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url "http://${GITLAB_HOST}"
+        gitlab_rails['initial_root_password'] = "${GITLAB_PASSWORD}"
         postgresql['enable'] = false
         gitlab_rails['db_host'] = 'postgres'
         gitlab_rails['db_username'] = 'gitlab'
-        gitlab_rails['db_password'] = 'gitlab'
+        gitlab_rails['db_password'] = "${GITLAB_PASSWORD}"
     depends_on:
-      - postgres  
+      - postgres
+    command: ['wait-deps-wrapper.sh', '/assets/wrapper']
+    restart: unless-stopped
+  keycloak:
+    image: quay.io/keycloak/keycloak:16.1.0
+    ports:
+      - 8080:8080/tcp
+      - 8443:8443/tcp
+    environment:
+      KEYCLOAK_USER: root
+      KEYCLOAK_PASSWORD: "${KEYCLOAK_PASSWORD}"
+      DB_VENDOR: postgres
+      DB_USER: keycloak
+      DB_PASSWORD: "${KEYCLOAK_PASSWORD}"
+      DB_ADDR: postgres
+      DB_DATABASE: keycloak
+    volumes:
+      - ./keycloak/wait-deps-wrapper.sh:/usr/local/bin/wait-deps-wrapper.sh:ro
+      - ./keycloak/healthcheck.sh:/usr/local/bin/healthcheck.sh:ro
+    depends_on:
+      - postgres
+    entrypoint: ['wait-deps-wrapper.sh', '/opt/jboss/tools/docker-entrypoint.sh', '-b 0.0.0.0']
+    healthcheck:
+      test: ['CMD-SHELL', 'healthcheck.sh']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
