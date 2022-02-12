@@ -1,6 +1,26 @@
 version: '3.9'
 
 services:
+  postgres:
+    image: postgres:12
+    expose:
+      - "5432"
+    user: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      GITLAB_USER: gitlab
+      GITLAB_PASSWORD: gitlab
+      GITLAB_DB: gitlabhq_production
+    volumes:
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
   gitlab:
     image: gitlab/gitlab-ce:13.2.9-ce.0
     ports:
@@ -11,3 +31,9 @@ services:
       GITLAB_OMNIBUS_CONFIG: |-
         external_url 'http://gitlab.myvoid.blog'
         gitlab_rails['initial_root_password'] = '********'
+        postgresql['enable'] = false
+        gitlab_rails['db_host'] = 'postgres'
+        gitlab_rails['db_username'] = 'gitlab'
+        gitlab_rails['db_password'] = 'gitlab'
+    depends_on:
+      - postgres  
