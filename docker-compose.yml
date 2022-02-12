@@ -26,9 +26,9 @@ services:
     restart: unless-stopped
   gitlab:
     image: gitlab/gitlab-ce:13.2.9-ce.0
+    expose:
+      - '80'
     ports:
-      - 80:80/tcp
-      - 443:443/tcp
       - 22:22/tcp
     volumes:
       - ./gitlab/wait-deps-wrapper.sh:/usr/local/bin/wait-deps-wrapper.sh:ro
@@ -46,15 +46,15 @@ services:
         gitlab_rails['db_host'] = 'postgres'
         gitlab_rails['db_username'] = 'gitlab'
         gitlab_rails['db_password'] = "${GITLAB_PASSWORD}"
+        nginx['redirect_http_to_https'] = false
     depends_on:
       - postgres
     command: ['wait-deps-wrapper.sh', '/assets/wrapper']
     restart: unless-stopped
   keycloak:
     image: quay.io/keycloak/keycloak:16.1.0
-    ports:
-      - 8080:8080/tcp
-      - 8443:8443/tcp
+    expose:
+      - '8080'
     environment:
       KEYCLOAK_USER: root
       KEYCLOAK_PASSWORD: "${KEYCLOAK_PASSWORD}"
@@ -65,12 +65,30 @@ services:
       DB_DATABASE: keycloak
     volumes:
       - ./keycloak/wait-deps-wrapper.sh:/usr/local/bin/wait-deps-wrapper.sh:ro
-      - ./keycloak/healthcheck.sh:/usr/local/bin/healthcheck.sh:ro
+      - ./keycloak/health-check.sh:/usr/local/bin/health-check.sh:ro
     depends_on:
       - postgres
     entrypoint: ['wait-deps-wrapper.sh', '/opt/jboss/tools/docker-entrypoint.sh', '-b 0.0.0.0']
     healthcheck:
-      test: ['CMD-SHELL', 'healthcheck.sh']
+      test: ['CMD-SHELL', 'health-check.sh']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+  nginx:
+    image: nginx:1
+    ports:
+      - 80:80/tcp
+    volumes:
+      - ./nginx/prepare-wrapper.sh:/usr/local/bin/prepare-wrapper.sh:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - gitlab
+      - keycloak
+    command: ['prepare-wrapper.sh', 'nginx', '-g daemon off;']
+    healthcheck:
+      test: ['CMD-SHELL', 'health-check.sh']
       interval: 10s
       timeout: 5s
       retries: 5
