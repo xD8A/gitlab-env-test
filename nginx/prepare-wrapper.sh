@@ -1,33 +1,17 @@
 #!/bin/sh
 
-sed -iE "s/gitlab.example.com/$GITLAB_HOST/g" /etc/nginx/conf.d/gitlab.conf
-sed -iE "s/keycloak.example.com/$KEYCLOAK_HOST/g" /etc/nginx/conf.d/keycloak.conf
+# CA
+sed -iE "s/(server_name\s+).*;/\1${CA_HOST:-ca.example.com};/g" /etc/nginx/conf.d/ca.conf
+sed -iE "s|(ssl_certificate\s+/etc/nginx/certs/).*|\1${CA_HOST:-ca.example.com}.crt|g" /etc/nginx/conf.d/ca.conf
+sed -iE "s|(ssl_certificate_key\s+/etc/nginx/secrets/).*|\1${CA_HOST:-ca.example.com}.key|g" /etc/nginx/conf.d/ca.conf
+# Keycloak
+sed -iE "s/(server_name\s+).*;/\1${KEYCLOAK_HOST:-keycloak.example.com};/g" /etc/nginx/conf.d/keycloak.conf
+sed -iE "s|(ssl_certificate\s+/etc/nginx/certs/).*|\1${KEYCLOAK_HOST:-keycloak.example.com}.crt|g" /etc/nginx/conf.d/keycloak.conf
+sed -iE "s|(ssl_certificate_key\s+/etc/nginx/secrets/).*|\1${KEYCLOAK_HOST:-keycloak.example.com}.key|g" /etc/nginx/conf.d/keycloak.conf
+# Gitlab
+sed -iE "s/(server_name\s+).*;/\1${GITLAB_HOST:-gitlab.example.com};/g" /etc/nginx/conf.d/gitlab.conf
+sed -iE "s|(ssl_certificate\s+/etc/nginx/certs/).*|\1${GITLAB_HOST:-gitlab.example.com}.crt|g" /etc/nginx/conf.d/gitlab.conf
+sed -iE "s|(ssl_certificate_key\s+/etc/nginx/secrets/).*|\1${GITLAB_HOST:-gitlab.example.com}.key|g" /etc/nginx/conf.d/gitlab.conf
 
-mkdir -p /etc/nginx/ssl
-export IP1=$(hostname -I)
-echo "IP Address: $IP1"
-cat << EOF > /etc/nginx/ssl/nginx.cnf
-[req]
-default_bits  = 2048
-distinguished_name = req_distinguished_name
-req_extensions = req_ext
-x509_extensions = v3_req
-prompt = no
-[req_distinguished_name]
-countryName = XX
-stateOrProvinceName = N/A
-localityName = N/A
-organizationName = N/A
-commonName = *.${DOMAIN}
-[req_ext]
-subjectAltName = @alt_names
-[v3_req]
-subjectAltName = @alt_names
-[alt_names]
-IP.1 = $IP1
-EOF
-openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-	-config /etc/nginx/ssl/nginx.cnf \
-	-keyout /etc/nginx/ssl/nginx.key -out /etc/nginx/ssl/nginx.crt
 
 $exec "$@"
